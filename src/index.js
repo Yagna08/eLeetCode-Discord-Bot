@@ -154,42 +154,62 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'solved') {
-        let uName = interaction.options.get('username').value;
-        if (!uName) {
+        // Get the username from the interaction options
+        const username = interaction.options.get('username')?.value;
+        if (!username) {
             await interaction.reply('Please provide a valid username.');
             return;
         }
-        const apiUrl = `https://alfa-leetcode-api.onrender.com/${uName}/solved`;
-        const apiUrlUser = `https://alfa-leetcode-api.onrender.com/${uName}`;
 
-        console.log(apiUrl)
+        // Define API URLs
+        const apiUrlSolved = `https://alfa-leetcode-api.onrender.com/${username}/solved`;
+        const apiUrlUser = `https://alfa-leetcode-api.onrender.com/${username}`;
+
+        console.log(`Fetching solved stats from: ${apiUrlSolved}`);
+        console.log(`Fetching user info from: ${apiUrlUser}`);
+
         try {
-            const response = await fetch(apiUrl);
-            if (!response.ok) {
-                throw new Error(`API error: ${response.statusText}`);
-            }
-            const response_user = await fetch(apiUrlUser);
-            if (!response_user.ok) {
-                throw new Error(`API error: ${response_user.statusText}`);
-            }
+            // Defer the reply to handle long API responses
+            await interaction.deferReply();
 
-            const data = await response.json();
-            const dataUser = await response_user.json();
+            // Fetch solved problem stats
+            const solvedResponse = await fetch(apiUrlSolved);
+            if (!solvedResponse.ok) {
+                throw new Error(`Failed to fetch solved stats: ${solvedResponse.statusText}`);
+            }
+            const solvedData = await solvedResponse.json();
 
-            const totalSolved = data.solvedProblem;
+            // Fetch user profile information
+            const userResponse = await fetch(apiUrlUser);
+            if (!userResponse.ok) {
+                throw new Error(`Failed to fetch user info: ${userResponse.statusText}`);
+            }
+            const userData = await userResponse.json();
+
+            // Extract data from API responses
+            const {
+                solvedProblem: totalSolved,
+                easySolved,
+                mediumSolved,
+                hardSolved,
+            } = solvedData;
+
+            const avatarLink = userData.avatar;
+
+            // Define problem totals
             const totalProblems = 3373;
-            const easySolved = data.easySolved;
             const easyTotal = 840;
-            const mediumSolved = data.mediumSolved;
             const mediumTotal = 1762;
-            const hardSolved = data.hardSolved;
             const hardTotal = 771;
-            const avatar_link = dataUser.avatar;
-            console.log(totalSolved, easySolved, mediumSolved,hardSolved,avatar_link)
-            
+
+            console.log(
+                `User: ${username}, Total Solved: ${totalSolved}, Easy: ${easySolved}, Medium: ${mediumSolved}, Hard: ${hardSolved}, Avatar: ${avatarLink}`
+            );
+
+            // Create the embed message
             const embed = new EmbedBuilder()
                 .setColor('#00FF7F') // A pleasant green color
-                .setTitle('Your Problem Solving Stats')
+                .setTitle(`${username}'s Problem Solving Stats`)
                 .setDescription('Here is an overview of your problem-solving progress:')
                 .addFields(
                     { name: '💡 **Total Solved**', value: `**${totalSolved}** / ${totalProblems}`, inline: false },
@@ -197,18 +217,31 @@ client.on('interactionCreate', async (interaction) => {
                     { name: '🟠 **Medium**', value: `**${mediumSolved}** / ${mediumTotal}`, inline: true },
                     { name: '🔴 **Hard**', value: `**${hardSolved}** / ${hardTotal}`, inline: true }
                 )
-                .setFooter({ text: 'Keep up the great work! 💪', iconURL: 'https://64.media.tumblr.com/eb9198d0964f22c050097e32b9155732/3c2a84734d55fd33-db/s1280x1920/7368de1ba606627f0a17477b98cd4f1f271118fe.png' }) // Add an optional footer
-                .setThumbnail(avatar_link) // Replace with a suitable image URL
+                .setFooter({
+                    text: 'Keep up the great work! 💪',
+                    iconURL: 'https://64.media.tumblr.com/eb9198d0964f22c050097e32b9155732/3c2a84734d55fd33-db/s1280x1920/7368de1ba606627f0a17477b98cd4f1f271118fe.png',
+                })
+                .setThumbnail(avatarLink) // Set the user's avatar as a thumbnail
                 .setTimestamp();
 
-            await interaction.reply({ embeds: [embed] });
+            // Send the embed message
+            await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            console.error(error);
-            await interaction.reply(
-                'Failed to fetch data. Please try again later or check the username.'
-            );
+            console.error(`Error fetching data for user ${username}:`, error);
+
+            // Send an error message
+            if (interaction.deferred) {
+                await interaction.editReply(
+                    'Failed to fetch data. Please try again later or check the username.'
+                );
+            } else {
+                await interaction.reply(
+                    'Failed to fetch data. Please try again later or check the username.'
+                );
+            }
         }
     }
+
 
     if (interaction.commandName === 'daily_problem') {
         const apiUrl = `https://alfa-leetcode-api.onrender.com/daily`;
